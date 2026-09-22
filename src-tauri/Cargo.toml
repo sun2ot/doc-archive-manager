@@ -1,0 +1,38 @@
+[package]
+name = "doc-archive-manager"
+version = "0.2.2"
+description = "笺藏 · 实体文档归档管家"
+authors = ["Doc Archive Manager"]
+edition = "2021"
+
+[lib]
+name = "archive_core"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.37", features = ["bundled", "serialize"] }
+aes-gcm = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+pinyin = "0.10"
+totp-rs = { version = "5.7", features = ["qr", "gen_secret"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+base64 = "0.22"
+rfd = "0.15"
+tempfile = "3"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

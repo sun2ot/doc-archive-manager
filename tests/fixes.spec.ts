@@ -1,0 +1,85 @@
+import {test,expect,type Page} from '@playwright/test';
+async function closeRequest(page:Page,fail=false){
+ await page.evaluate(async(fail)=>{
+  const module=await import('/src/window-close.ts');
+  const w=window as any;w.closeCalls??=[];
+  void module.handleWindowClose({minimize:async()=>{if(fail)throw Error('failed');w.closeCalls.push('minimize');},destroy:async()=>{w.closeCalls.push('exit');}});
+ },fail);
+}
+test('new location appears when editing a file with an existing location',async({page})=>{
+ await page.goto('/');
+ await page.locator('[data-nav="settings"]').click();
+ await page.getByRole('button',{name:/档案资料/}).click();
+ await page.getByRole('button',{name:/物理位置/}).click();
+ await page.locator('#location-form input').fill('新位置 Z 柜');
+ await page.getByRole('button',{name:'新增位置',exact:true}).click();
+ await expect(page.locator('.managed-location').filter({hasText:'新位置 Z 柜'})).toHaveCount(1);
+ await page.locator('.nav-item[data-nav="all"]').click();
+ await page.locator('tbody tr').first().click();
+ await page.getByRole('button',{name:'编辑记录',exact:true}).click();
+ const location=page.locator('#document-form [name="location"]');
+ await expect(location).not.toHaveValue('');
+ await location.click();
+ await expect(page.getByRole('option',{name:'新位置 Z 柜',exact:true})).toBeVisible();
+ await location.fill('Z');
+ await page.getByRole('option',{name:'新位置 Z 柜',exact:true}).click();
+ await page.getByRole('button',{name:'保存记录',exact:true}).click();
+ await expect(page.locator('.location-card')).toContainText('新位置 Z 柜');
+});
+test('requests omit number and directory notes truncate safely',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'登记文件',exact:true}).click();
+ await page.locator('[name="number"]').fill('不属于请示的文号');
+ await page.locator('[name="kind"][value="request"]').check();
+ await expect(page.locator('[name="number"]')).toBeHidden();
+ await expect(page.locator('#number-template')).toBeDisabled();
+ await page.locator('[name="title"]').fill('无文号请示');
+ const notes='<img src=x onerror=alert(1)> '+ '需要跟进的事项。'.repeat(60);
+ await page.locator('[name="notes"]').fill(notes);
+ await page.getByRole('button',{name:'保存记录',exact:true}).click();
+ await expect(page.locator('.document-number')).toHaveCount(0);
+ const row=page.locator('tbody tr').filter({hasText:'无文号请示'});
+ await expect(row).not.toContainText('暂无文号');
+ await expect(row.locator('.record-note')).toHaveAttribute('title',notes);
+ expect(await row.locator('.record-note').evaluate(el=>el.scrollWidth>el.clientWidth&&getComputedStyle(el).textOverflow==='ellipsis')).toBeTruthy();
+ await expect(row.locator('.record-note img')).toHaveCount(0);
+ await page.getByRole('button',{name:'编辑记录',exact:true}).click();
+ await page.locator('[name="kind"][value="incoming"]').check();
+ await expect(page.locator('[name="number"]')).toHaveValue('');
+});
+test('close choice preserves editor, remembers minimize and can reset in settings',async({page})=>{
+ await page.goto('/');
+ await page.getByRole('button',{name:'登记文件',exact:true}).click();
+ await page.locator('[name="title"]').fill('尚未保存');
+ await closeRequest(page);
+ await expect(page.getByRole('dialog',{name:'关闭笺藏'})).toBeVisible();
+ await page.locator('.window-close-dialog').press('Escape');
+ await expect(page.locator('[name="title"]')).toHaveValue('尚未保存');
+ await closeRequest(page);
+ await page.getByLabel('记住选择，下次不再提醒').check();
+ await page.getByRole('button',{name:'最小化到任务栏',exact:true}).click();
+ await expect(page.locator('.window-close-dialog')).toHaveCount(0);
+ await expect(page.locator('[name="title"]')).toHaveValue('尚未保存');
+ await page.reload();
+ await closeRequest(page);
+ await expect.poll(()=>page.evaluate(()=>(window as any).closeCalls)).toEqual(['minimize']);
+ await expect(page.locator('.window-close-dialog')).toHaveCount(0);
+ await page.locator('[data-nav="settings"]').click();
+ await page.locator('#close-behavior').selectOption('ask');
+ await closeRequest(page);
+ await page.getByRole('button',{name:'退出程序',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>(window as any).closeCalls)).toEqual(['minimize','exit']);
+ expect(await page.evaluate(()=>localStorage.getItem('jiancang-window-close'))).toBe('ask');
+});
+test('close failure is recoverable and remembered exit still protects open edits',async({page})=>{
+ await page.goto('/');
+ await closeRequest(page,true);
+ await page.getByLabel('记住选择，下次不再提醒').check();
+ await page.getByRole('button',{name:'最小化到任务栏',exact:true}).click();
+ await expect(page.locator('.close-error')).toContainText('操作未完成');
+ await page.locator('.window-close-dialog').getByRole('button',{name:'取消',exact:true}).click();
+ await page.evaluate(()=>localStorage.setItem('jiancang-window-close','exit'));
+ await page.getByRole('button',{name:'登记文件',exact:true}).click();
+ await closeRequest(page);
+ await expect(page.locator('.window-close-dialog')).toContainText('丢弃未保存');
+});
