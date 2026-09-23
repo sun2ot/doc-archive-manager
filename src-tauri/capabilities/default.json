@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Only the local archive window may invoke application commands.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-minimize", "core:window:allow-destroy"]
+  "permissions": ["core:default", "core:window:allow-hide", "core:window:allow-show", "core:window:allow-unminimize"]
 }

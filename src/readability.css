@@ -370,3 +370,4 @@ body { width:auto; }
 .window-close-dialog .checkbox-field { color:var(--text); margin:20px 0; }
 .close-dialog-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; }
 .close-error { color:#bd423f; }
+/* Window close preferences from earlier versions are migrated at read time. */

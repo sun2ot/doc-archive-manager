@@ -3,7 +3,7 @@ async function closeRequest(page:Page,fail=false){
  await page.evaluate(async(fail)=>{
   const module=await import('/src/window-close.ts');
   const w=window as any;w.closeCalls??=[];
-  void module.handleWindowClose({minimize:async()=>{if(fail)throw Error('failed');w.closeCalls.push('minimize');},destroy:async()=>{w.closeCalls.push('exit');}});
+  void module.handleWindowClose({hide:async()=>{if(fail)throw Error('failed');w.closeCalls.push('tray');},exit:async()=>{w.closeCalls.push('exit');}});
  },fail);
 }
 test('new location appears when editing a file with an existing location',async({page})=>{
@@ -47,7 +47,7 @@ test('requests omit number and directory notes truncate safely',async({page})=>{
  await page.locator('[name="kind"][value="incoming"]').check();
  await expect(page.locator('[name="number"]')).toHaveValue('');
 });
-test('close choice preserves editor, remembers minimize and can reset in settings',async({page})=>{
+test('close choice preserves editor, remembers tray and can reset in settings',async({page})=>{
  await page.goto('/');
  await page.getByRole('button',{name:'登记文件',exact:true}).click();
  await page.locator('[name="title"]').fill('尚未保存');
@@ -57,25 +57,25 @@ test('close choice preserves editor, remembers minimize and can reset in setting
  await expect(page.locator('[name="title"]')).toHaveValue('尚未保存');
  await closeRequest(page);
  await page.getByLabel('记住选择，下次不再提醒').check();
- await page.getByRole('button',{name:'最小化到任务栏',exact:true}).click();
+ await page.getByRole('button',{name:'最小化到托盘',exact:true}).click();
  await expect(page.locator('.window-close-dialog')).toHaveCount(0);
  await expect(page.locator('[name="title"]')).toHaveValue('尚未保存');
  await page.reload();
  await closeRequest(page);
- await expect.poll(()=>page.evaluate(()=>(window as any).closeCalls)).toEqual(['minimize']);
+ await expect.poll(()=>page.evaluate(()=>(window as any).closeCalls)).toEqual(['tray']);
  await expect(page.locator('.window-close-dialog')).toHaveCount(0);
  await page.locator('[data-nav="settings"]').click();
  await page.locator('#close-behavior').selectOption('ask');
  await closeRequest(page);
  await page.getByRole('button',{name:'退出程序',exact:true}).click();
- await expect.poll(()=>page.evaluate(()=>(window as any).closeCalls)).toEqual(['minimize','exit']);
+ await expect.poll(()=>page.evaluate(()=>(window as any).closeCalls)).toEqual(['tray','exit']);
  expect(await page.evaluate(()=>localStorage.getItem('jiancang-window-close'))).toBe('ask');
 });
 test('close failure is recoverable and remembered exit still protects open edits',async({page})=>{
  await page.goto('/');
  await closeRequest(page,true);
  await page.getByLabel('记住选择，下次不再提醒').check();
- await page.getByRole('button',{name:'最小化到任务栏',exact:true}).click();
+ await page.getByRole('button',{name:'最小化到托盘',exact:true}).click();
  await expect(page.locator('.close-error')).toContainText('操作未完成');
  await page.locator('.window-close-dialog').getByRole('button',{name:'取消',exact:true}).click();
  await page.evaluate(()=>localStorage.setItem('jiancang-window-close','exit'));
